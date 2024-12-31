@@ -88,29 +88,43 @@ namespace Gear_Shifting_Anim
             Tick += Loop;
         }
 
-        private async void playAnim(Ped ped, int currGear, bool isCar)
+        private async void playAnim(Ped ped, int currGear)
         {
             if (useMT)
                 MT_ToggleSteeringAnimation(false);
 
-            // choose animation
             string animToPlay = "veh@driveby@first_person@";
+            string animDict = "outro_0";
+            string soundFile = "gear" + currGear;
             Vehicle veh = ped.CurrentVehicle;
+            bool isCar = veh.Model.IsCar;
 
             if (isCar)
                 animToPlay += isLeftHandDrive(veh) ? "passenger_rear_right_handed@smg" : "passenger_rear_left_handed@smg";
             else
-                animToPlay += "bike@driver@1h";
+            {
+                if (shiftWithLeg)
+                {
+                    animToPlay = "veh@bike@dirt@front@base";
+                    animDict = "start_engine";
+                    soundFile = "BGearLeg";
+                }
+                else
+                {
+                    animToPlay += "bike@driver@1h";
+                    animDict = "into_0";
+                    soundFile = "BGear";
+                }
+            }
 
             if (!Function.Call<bool>(Hash.HAS_ANIM_DICT_LOADED, animToPlay))
                 Function.Call(Hash.REQUEST_ANIM_DICT, animToPlay);
 
-            if (!Function.Call<bool>(Hash.IS_ENTITY_PLAYING_ANIM, Game.Player.Character, animToPlay, "outro_0", 3))
+            if (!Function.Call<bool>(Hash.IS_ENTITY_PLAYING_ANIM, Game.Player.Character, animToPlay, animDict, 3))
             {
-                Function.Call(Hash.TASK_PLAY_ANIM, Game.Player.Character, animToPlay, "outro_0", 5f, -3f, -1, 48, 0f, 0, 0, 0);
+                Function.Call(Hash.TASK_PLAY_ANIM, Game.Player.Character, animToPlay, animDict, 5f, -3f, 800, 0, 0, 0, 0, 0);
 
                 // play sound
-                string soundFile = isCar ? "gear" + currGear : "motorcycle";
                 audio.init(soundFile);
                 audio.play(volume);
 
@@ -131,7 +145,6 @@ namespace Gear_Shifting_Anim
                 return;
 
             int currGear = ped.CurrentVehicle.CurrentGear;
-            bool isCar = ped.CurrentVehicle.Model.IsCar;
 
             // print gear
             if (printGearText)
@@ -147,11 +160,16 @@ namespace Gear_Shifting_Anim
                 ShowText(textPosX, textPosY, gearText);
             }
 
+            // if using mt, check if in neutral gear, if so, don't do anything
+            if (useMT)
+                if (MT_NeutralGear())
+                    return;
+
             // no need to update if gear is the same
             if (currGear == prevGear)
                 return;
 
-            playAnim(ped, currGear, isCar);
+            playAnim(ped, currGear);
 
             // update prevGear
             prevGear = currGear;
