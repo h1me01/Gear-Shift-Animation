@@ -18,7 +18,8 @@ namespace Gear_Shifting_Anim
         // options
         private bool printGearText = true;
         private bool shiftWithLeg = false;
-
+        private bool animMotorcycle = true;
+        private bool useSound = true;
         private float volume = 0;
 
         // MT
@@ -75,10 +76,10 @@ namespace Gear_Shifting_Anim
 
                 // ini options
                 printGearText = config.GetValue<bool>("Options", "GearsText", true);
-                shiftWithLeg = config.GetValue<bool>("Motorcycle", "Shift with Leg", false);
-
-
-                volume = config.GetValue<float>("Sound", "Volume", 50f) / 100f;
+                shiftWithLeg = config.GetValue<bool>("Motorcycle", "ShiftWithLeg", false);
+                animMotorcycle = config.GetValue("Motorcycle", "UseMotorcycleShiftingAnim", true);
+                useSound = config.GetValue("Sounds", "UseSound", true);
+                volume = config.GetValue<float>("Sounds", "Volume", 50f) / 100f;
             }
             catch (Exception ex)
             {
@@ -103,6 +104,10 @@ namespace Gear_Shifting_Anim
                 animToPlay += isLeftHandDrive(veh) ? "passenger_rear_right_handed@smg" : "passenger_rear_left_handed@smg";
             else
             {
+                // if not using motorcycle anim, don't do anything
+                if (!animMotorcycle)
+                    return;
+
                 if (shiftWithLeg)
                 {
                     animToPlay = "veh@bike@dirt@front@base";
@@ -119,13 +124,16 @@ namespace Gear_Shifting_Anim
             if (!Function.Call<bool>(Hash.HAS_ANIM_DICT_LOADED, animToPlay))
                 Function.Call(Hash.REQUEST_ANIM_DICT, animToPlay);
 
-            if (!Function.Call<bool>(Hash.IS_ENTITY_PLAYING_ANIM, Game.Player.Character, animToPlay, animDict, 3))
+            if (!Function.Call<bool>(Hash.IS_ENTITY_PLAYING_ANIM, ped, animToPlay, animDict, 3))
             {
-                Function.Call(Hash.TASK_PLAY_ANIM, Game.Player.Character, animToPlay, animDict, 5f, -3f, 800, 0, 0, 0, 0, 0);
+                Function.Call(Hash.TASK_PLAY_ANIM, ped, animToPlay, animDict, 5f, -3f, 800, 0, 0, 0, 0, 0);
 
                 // play sound
-                audio.init(soundFile);
-                audio.play(volume);
+                if (useSound)
+                {
+                    audio.init(soundFile);
+                    audio.play(volume);
+                }
 
                 if (useMT)
                     await Task.Delay(1000);
