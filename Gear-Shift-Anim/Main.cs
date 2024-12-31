@@ -1,15 +1,13 @@
 ﻿using GTA;
 using GTA.Native;
 using System;
-using System.Diagnostics;
-using System.IO;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 
 namespace Gear_Shifting_Anim
 {
     public class ShiftAnim : Script
     {
-
         private ScriptSettings config;
 
         private Audio audio = new Audio();
@@ -17,20 +15,21 @@ namespace Gear_Shifting_Anim
         private float textPosX = 0.925f, textPosY = 0.85f;
         private int prevGear = -1;
 
+        // options
         private bool printGearText = true;
-        private bool isLeftHandDrive = true; // default is left hand drive
+        private bool shiftWithLeg = false;
 
-        //Sounds
         private float volume = 0;
 
         // MT
         private bool useMT = false;
         private bool printMTInfo = false;
 
-        private FnGetBool isMTActive;
-        private FnGetIntPtr MTVersion;
-        private FnSetVoid ToggleMTSteeringAnimation;
-        private FnGetBool MTNeutralGear;
+        private FnGetBool MT_IsActive;
+        private FnGetIntPtr MT_GetVersion;
+        private FnSetVoid MT_ToggleSteeringAnimation;
+        private FnGetBool MT_NeutralGear;
+        private FnGetInt MT_GetShiftMode;
 
         public ShiftAnim()
         {
@@ -48,14 +47,17 @@ namespace Gear_Shifting_Anim
                 // mt integration
                 useMT = config.GetValue<bool>("Options", "MTMode", true);
                 printMTInfo = config.GetValue<bool>("Options", "MTInformationText", true);
-                isMTActive = CheckAddr<FnGetBool>(mtLib, "MT_IsActive");
-                MTVersion = CheckAddr<FnGetIntPtr>(mtLib, "MT_GetVersion");
-                ToggleMTSteeringAnimation = CheckAddr<FnSetVoid>(mtLib, "MT_ToggleSteeringAnimation");
-                MTNeutralGear = CheckAddr<FnGetBool>(mtLib, "MT_NeutralGear");
 
-                if (isMTActive == null || MTVersion == null || ToggleMTSteeringAnimation == null || MTNeutralGear == null)
+                // access MT functions
+                MT_IsActive = CheckAddr<FnGetBool>(mtLib, "MT_IsActive");
+                MT_GetVersion = CheckAddr<FnGetIntPtr>(mtLib, "MT_GetVersion");
+                MT_ToggleSteeringAnimation = CheckAddr<FnSetVoid>(mtLib, "MT_ToggleSteeringAnimation");
+                MT_NeutralGear = CheckAddr<FnGetBool>(mtLib, "MT_NeutralGear");
+                MT_GetShiftMode = CheckAddr<FnGetInt>(mtLib, "MT_GetShiftMode");
+
+                // if one of the functions is null, disable MT integration
+                if (MT_IsActive == null || MT_GetVersion == null || MT_ToggleSteeringAnimation == null || MT_NeutralGear == null || MT_GetShiftMode == null)
                 {
-                    // disable any MT integration
                     useMT = false;
 
                     if (useMT)
@@ -66,17 +68,15 @@ namespace Gear_Shifting_Anim
 
                 if (useMT && printMTInfo)
                 {
-                    var strResult = Marshal.PtrToStringAnsi(MTVersion());
+                    var strResult = Marshal.PtrToStringAnsi(MT_GetVersion());
                     Utility.Log("MT Ver: " + strResult);
-                    Utility.Log("MT Act: " + (isMTActive() ? "Yes" : "No"));
+                    Utility.Log("MT Act: " + (MT_IsActive() ? "Yes" : "No"));
                 }
 
                 // ini options
                 printGearText = config.GetValue<bool>("Options", "GearsText", true);
+                shiftWithLeg = config.GetValue<bool>("Motorcycle", "Shift with Leg", false);
 
-                // set to right hand drive if set to true
-                if (config.GetValue<bool>("Options", "RightHandDrive", false))
-                    isLeftHandDrive = false;
 
                 volume = config.GetValue<float>("Sound", "Volume", 50f) / 100f;
             }
@@ -88,6 +88,42 @@ namespace Gear_Shifting_Anim
             Tick += Loop;
         }
 
+        private async void playAnim(Ped ped, int currGear, bool isCar)
+        {
+            if (useMT)
+                MT_ToggleSteeringAnimation(false);
+
+            // choose animation
+            string animToPlay = "veh@driveby@first_person@";
+            Vehicle veh = ped.CurrentVehicle;
+
+            if (isCar)
+                animToPlay += isLeftHandDrive(veh) ? "passenger_rear_right_handed@smg" : "passenger_rear_left_handed@smg";
+            else
+                animToPlay += "bike@driver@1h";
+
+            if (!Function.Call<bool>(Hash.HAS_ANIM_DICT_LOADED, animToPlay))
+                Function.Call(Hash.REQUEST_ANIM_DICT, animToPlay);
+
+            if (!Function.Call<bool>(Hash.IS_ENTITY_PLAYING_ANIM, Game.Player.Character, animToPlay, "outro_0", 3))
+            {
+                Function.Call(Hash.TASK_PLAY_ANIM, Game.Player.Character, animToPlay, "outro_0", 5f, -3f, -1, 48, 0f, 0, 0, 0);
+
+                // play sound
+                string soundFile = isCar ? "gear" + currGear : "motorcycle";
+                audio.init(soundFile);
+                audio.play(volume);
+
+                if (useMT)
+                    await Task.Delay(1000);
+            }
+            else if (useMT)
+                await Task.Delay(500);
+
+            if (useMT)
+                MT_ToggleSteeringAnimation(true);
+        }
+
         private void Loop(object source, EventArgs e)
         {
             Ped ped = Game.Player?.Character;
@@ -95,6 +131,7 @@ namespace Gear_Shifting_Anim
                 return;
 
             int currGear = ped.CurrentVehicle.CurrentGear;
+            bool isCar = ped.CurrentVehicle.Model.IsCar;
 
             // print gear
             if (printGearText)
@@ -102,7 +139,7 @@ namespace Gear_Shifting_Anim
                 string gearText = "Gear: ";
                 if (!useMT)
                     gearText += currGear;
-                else if (MTNeutralGear()) // in neutral gear?
+                else if (MT_NeutralGear()) // in neutral gear?
                     gearText += "Neutral";
                 else
                     gearText += currGear;
@@ -110,38 +147,14 @@ namespace Gear_Shifting_Anim
                 ShowText(textPosX, textPosY, gearText);
             }
 
-            // no need to do anything if gear hasn't changed
+            // no need to update if gear is the same
             if (currGear == prevGear)
                 return;
 
-            // choose animation
-            bool isCar = ped.CurrentVehicle.Model.IsCar;
-            string animToPlay = "veh@driveby@first_person@";
-
-            if (isCar)
-                animToPlay += isLeftHandDrive ? "passenger_rear_right_handed@smg" : "passenger_rear_left_handed@smg";
-            else
-                animToPlay += "bike@driver@1h";
-
-            Function.Call(Hash.REQUEST_ANIM_DICT, animToPlay, true);
-            while (!Function.Call<bool>(Hash.HAS_ANIM_DICT_LOADED, animToPlay, true))
-                Wait(1);  // wait till animation is loaded into memory
-
-            // play animation
-            Function.Call(Hash.TASK_PLAY_ANIM, ped, animToPlay, "outro_0", 8.0, 8.0, 800, 50, 0, false, false, false);
-            while (Function.Call<bool>(Hash.IS_ENTITY_PLAYING_ANIM, ped, animToPlay, "outro_0", 3))
-                Wait(1); // wait till animation ends
-
-            if (useMT)
-                ToggleMTSteeringAnimation(true);
+            playAnim(ped, currGear, isCar);
 
             // update prevGear
             prevGear = currGear;
-
-            // play sound
-            string soundFile = isCar ? "gear" + currGear : "motorcycle";
-            audio.init(soundFile);
-            audio.play(volume);
         }
 
         // private helper functions
@@ -168,5 +181,12 @@ namespace Gear_Shifting_Anim
             Function.Call(Hash.END_TEXT_COMMAND_DISPLAY_TEXT, x, y);
         }
 
+        private bool isLeftHandDrive(Vehicle veh)
+        {
+            int driverSeatBoneIdx = Function.Call<int>(Hash.GET_ENTITY_BONE_INDEX_BY_NAME, veh, "seat_dside_f");
+            GTA.Math.Vector3 driverSeatPos = Function.Call<GTA.Math.Vector3>(Hash.GET_WORLD_POSITION_OF_ENTITY_BONE, veh, driverSeatBoneIdx);
+            GTA.Math.Vector3 driverSeatPosRel = Function.Call<GTA.Math.Vector3>(Hash.GET_OFFSET_FROM_ENTITY_GIVEN_WORLD_COORDS, veh, driverSeatPos.X, driverSeatPos.Y, driverSeatPos.Z);
+            return !(driverSeatPosRel.X > 0.01f);
+        }
     }
 }
