@@ -112,7 +112,6 @@ namespace Gear_Shifting_Anim
                 else
                 {
                     animToPlay += "bike@driver@1h";
-                    animDict = "into_0";
                     soundFile = "BGear";
                 }
             }
