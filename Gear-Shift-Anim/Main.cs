@@ -104,7 +104,7 @@ namespace Gear_Shifting_Anim
                 animToPlay += isLeftHandDrive(veh) ? "passenger_rear_right_handed@smg" : "passenger_rear_left_handed@smg";
             else
             {
-                // if not using motorcycle anim, don't do anything
+                // if motorcycle anim isn't enabled, do nothing
                 if (!animMotorcycle)
                     return;
 
@@ -167,7 +167,7 @@ namespace Gear_Shifting_Anim
                 ShowText(textPosX, textPosY, gearText);
             }
 
-            // if using mt, check if in neutral gear, if so, don't do anything
+            // if using mt, check if in neutral gear, if so, do nothing
             if (useMT)
                 if (MT_NeutralGear())
                     return;
