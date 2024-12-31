@@ -126,7 +126,7 @@ namespace Gear_Shifting_Anim
 
             if (!Function.Call<bool>(Hash.IS_ENTITY_PLAYING_ANIM, ped, animToPlay, animDict, 3))
             {
-                Function.Call(Hash.TASK_PLAY_ANIM, ped, animToPlay, animDict, 5f, -3f, 800, 0, 0, 0, 0, 0);
+                Function.Call(Hash.TASK_PLAY_ANIM, ped, animToPlay, animDict, 5f, -3f, -1, 0, 0, 0, 0, 0);
 
                 // play sound
                 if (useSound)
