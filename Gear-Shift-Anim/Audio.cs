@@ -1,6 +1,5 @@
 ﻿using GTA.Native;
 using NAudio.Wave;
-using System.Diagnostics;
 using System;
 using System.IO;
 
@@ -9,7 +8,7 @@ namespace Gear_Shifting_Anim
     class Audio
     {
         private DirectSoundOut output;
-        private WaveFileReader reader;  
+        private WaveFileReader reader;
         private WaveChannel32 streaming;
 
         public void init(string soundFile)
@@ -52,6 +51,7 @@ namespace Gear_Shifting_Anim
                 streaming.Volume = volume - 0.2f;
 
             output.Play();
+            output.Dispose();
         }
     }
 }

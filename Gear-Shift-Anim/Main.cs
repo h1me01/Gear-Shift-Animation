@@ -20,6 +20,19 @@ namespace Gear_Shifting_Anim
         private bool shiftWithLeg = false;
         private bool animMotorcycle = true;
         private bool useSound = true;
+        
+        private string rightHandAnimDict = "veh@driveby@first_person@passenger_rear_right_handed@smg";
+        private string rightHandAnim = "outro_0";
+        
+        private string leftHandAnimDict = "veh@driveby@first_person@passenger_rear_left_handed@smg";
+        private string leftHandAnim = "outro_0";
+
+        private string motorcycleAnimDict = "veh@driveby@first_person@bike@driver@1h";
+        private string motorcycleAnim = "outro_0";
+
+        private string motorcycleLegAnimDict = "veh@bike@dirt@front@base";
+        private string motorcycleLegAnim = "start_engine";
+        
         private float volume = 0;
 
         // MT
@@ -78,6 +91,21 @@ namespace Gear_Shifting_Anim
                 printGearText = config.GetValue<bool>("Options", "GearsText", true);
                 shiftWithLeg = config.GetValue<bool>("Motorcycle", "ShiftWithLeg", false);
                 animMotorcycle = config.GetValue("Motorcycle", "UseMotorcycleShiftingAnim", true);
+
+                // animations
+                rightHandAnimDict = config.GetValue("Animations", "RightHandAnimDict", rightHandAnimDict);
+                rightHandAnim = config.GetValue("Animations", "RightHandAnim", rightHandAnim);
+                
+                leftHandAnimDict = config.GetValue("Animations", "LeftHandAnimDict", leftHandAnimDict);
+                leftHandAnim = config.GetValue("Animations", "LeftHandAnim", leftHandAnim);
+
+                motorcycleAnimDict = config.GetValue("Animations", "MotorcycleAnimDict", motorcycleAnimDict);
+                motorcycleAnim = config.GetValue("Animations", "MotorcycleAnim", motorcycleAnim);
+
+                motorcycleLegAnimDict = config.GetValue("Animations", "MotorcycleLegAnimDict", motorcycleLegAnimDict);
+                motorcycleLegAnim = config.GetValue("Animations", "MotorcycleLegAnim", motorcycleLegAnim);
+
+                // sounds
                 useSound = config.GetValue("Sounds", "UseSound", true);
                 volume = config.GetValue<float>("Sounds", "Volume", 50f) / 100f;
             }
@@ -94,14 +122,17 @@ namespace Gear_Shifting_Anim
             if (useMT)
                 MT_ToggleSteeringAnimation(false);
 
-            string animToPlay = "veh@driveby@first_person@";
-            string animDict = "outro_0";
+            string animDict, animToPlay;
             string soundFile = "gear" + currGear;
             Vehicle veh = ped.CurrentVehicle;
             bool isCar = veh.Model.IsCar;
+            bool isLeftHand = isLeftHandDrive(veh);
 
             if (isCar)
-                animToPlay += isLeftHandDrive(veh) ? "passenger_rear_right_handed@smg" : "passenger_rear_left_handed@smg";
+            {
+                animDict = isLeftHand ? leftHandAnimDict : rightHandAnimDict;
+                animToPlay = isLeftHand ? leftHandAnim : rightHandAnim;
+            }
             else
             {
                 // if motorcycle anim isn't enabled, do nothing
@@ -110,23 +141,24 @@ namespace Gear_Shifting_Anim
 
                 if (shiftWithLeg)
                 {
-                    animToPlay = "veh@bike@dirt@front@base";
-                    animDict = "start_engine";
-                    soundFile = "BGearLeg";
+                    animDict = motorcycleLegAnimDict;
+                    animToPlay = motorcycleLegAnim;
+                    soundFile = "MGearLeg";
                 }
                 else
                 {
-                    animToPlay += "bike@driver@1h";
-                    soundFile = "BGear";
+                    animDict = motorcycleAnimDict;
+                    animToPlay = motorcycleAnim;
+                    soundFile = "MGear";
                 }
             }
 
-            if (!Function.Call<bool>(Hash.HAS_ANIM_DICT_LOADED, animToPlay))
-                Function.Call(Hash.REQUEST_ANIM_DICT, animToPlay);
+            if (!Function.Call<bool>(Hash.HAS_ANIM_DICT_LOADED, animDict))
+                Function.Call(Hash.REQUEST_ANIM_DICT, animDict);
 
-            if (!Function.Call<bool>(Hash.IS_ENTITY_PLAYING_ANIM, ped, animToPlay, animDict, 3))
+            if (!Function.Call<bool>(Hash.IS_ENTITY_PLAYING_ANIM, ped, animDict, animToPlay, 3))
             {
-                Function.Call(Hash.TASK_PLAY_ANIM, ped, animToPlay, animDict, 5f, -3f, -1, 0, 0, 0, 0, 0);
+                Function.Call(Hash.TASK_PLAY_ANIM, ped, animDict, animToPlay, 5f, -3f, -1);
 
                 // play sound
                 if (useSound)
