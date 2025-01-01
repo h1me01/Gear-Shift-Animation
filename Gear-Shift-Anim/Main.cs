@@ -199,10 +199,10 @@ namespace Gear_Shifting_Anim
                 ShowText(textPosX, textPosY, gearText);
             }
 
-            // if using mt, check if in neutral gear, if so, do nothing
+            // if using mt, check if in neutral gear, if so, set gear to -1
             if (useMT)
                 if (MT_NeutralGear())
-                    return;
+                    currGear = -1;
 
             // no need to update if gear is the same
             if (currGear == prevGear)
