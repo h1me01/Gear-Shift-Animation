@@ -28,7 +28,7 @@ Some might recognize it from [here](https://www.gta5-mods.com/scripts/gear-shift
 Drop all files from the `scripts` folder into your game's `scripts` folder.
 
 ## Requirements
-- **ScripthookV**: Version 3.6.0 Community ScripthookV or higher.
+- **ScripthookV**: Version 3.7.0 Community ScripthookV or higher.
 
 ## Credits
 - Special thanks to **ikt** for:
